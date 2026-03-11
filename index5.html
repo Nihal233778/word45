@@ -1,0 +1,353 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ScrambleMaster · Word Scramble</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+        body {
+            font-family: 'Segoe UI', Roboto, system-ui, sans-serif;
+            background: linear-gradient(145deg, #f6f9fc 0%, #e6f0f5 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 16px;
+        }
+        .game-card {
+            max-width: 480px;
+            width: 100%;
+            background: rgba(255, 255, 255, 0.85);
+            backdrop-filter: blur(4px);
+            border-radius: 32px;
+            box-shadow: 0 20px 40px -10px rgba(0, 40, 80, 0.25);
+            padding: 28px 24px;
+            border: 1px solid rgba(255, 255, 255, 0.5);
+            transition: transform 0.2s ease;
+        }
+        h1 {
+            font-size: 2rem;
+            font-weight: 600;
+            color: #1a3b5d;
+            letter-spacing: -0.5px;
+            margin-bottom: 4px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        h1 span {
+            background: #ffe9a7;
+            padding: 4px 12px;
+            border-radius: 40px;
+            font-size: 0.8rem;
+            font-weight: 500;
+            color: #7d5d23;
+        }
+        .scrambled-box {
+            background: #1a3b5d;
+            border-radius: 24px;
+            padding: 24px 12px;
+            margin: 24px 0 20px;
+            box-shadow: inset 0 4px 8px rgba(0,0,0,0.2), 0 8px 0 #0f2a41;
+        }
+        #scrambledWord {
+            font-size: 3.2rem;
+            font-weight: 800;
+            letter-spacing: 12px;
+            text-transform: uppercase;
+            color: #f7e05e;
+            text-shadow: 0 3px 0 #b28f2c;
+            word-break: break-word;
+            line-height: 1.2;
+        }
+        .input-area {
+            display: flex;
+            gap: 10px;
+            margin: 20px 0 12px;
+            flex-wrap: wrap;
+        }
+        #guessInput {
+            flex: 1 1 200px;
+            padding: 16px 18px;
+            border: 2px solid #cbd6e3;
+            border-radius: 40px;
+            font-size: 1.2rem;
+            font-weight: 500;
+            text-transform: uppercase;
+            background: white;
+            outline: none;
+            transition: border 0.15s;
+        }
+        #guessInput:focus {
+            border-color: #1a3b5d;
+        }
+        .primary-btn {
+            background: #2e6b3e;
+            color: white;
+            border: none;
+            padding: 16px 28px;
+            border-radius: 40px;
+            font-size: 1.2rem;
+            font-weight: 600;
+            cursor: pointer;
+            box-shadow: 0 6px 0 #1d4529;
+            transition: 0.07s linear;
+            border: 1px solid #58a36f;
+        }
+        .primary-btn:active {
+            transform: translateY(4px);
+            box-shadow: 0 2px 0 #1d4529;
+        }
+        .primary-btn:disabled {
+            opacity: 0.5;
+            transform: none;
+            box-shadow: 0 6px 0 #1d4529;
+            pointer-events: none;
+        }
+        .message {
+            min-height: 40px;
+            font-size: 1.2rem;
+            font-weight: 500;
+            color: #1a3b5d;
+            margin: 12px 0 8px;
+            padding: 8px 12px;
+            background: #e8f0fe;
+            border-radius: 30px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .reward-row {
+            display: flex;
+            gap: 12px;
+            margin: 24px 0 16px;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+        .reward-btn {
+            background: #f4a261;
+            border: none;
+            color: #2d1f00;
+            font-weight: 600;
+            font-size: 1.1rem;
+            padding: 14px 24px;
+            border-radius: 40px;
+            cursor: pointer;
+            box-shadow: 0 5px 0 #b96f2e;
+            transition: 0.07s linear;
+            flex: 1 1 160px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+            border: 1px solid #ffc107;
+        }
+        .reward-btn:active {
+            transform: translateY(4px);
+            box-shadow: 0 1px 0 #b96f2e;
+        }
+        .reward-btn i {
+            font-style: normal;
+            font-size: 1.3rem;
+        }
+        footer {
+            margin-top: 30px;
+            font-size: 0.85rem;
+            color: #5d738b;
+            display: flex;
+            justify-content: center;
+            gap: 24px;
+            border-top: 1px dashed #b3c7db;
+            padding-top: 20px;
+        }
+        footer a {
+            color: #1a3b5d;
+            text-decoration: none;
+            font-weight: 500;
+        }
+        footer a:hover {
+            text-decoration: underline;
+        }
+        .score-badge {
+            background: #d4e0eb;
+            border-radius: 50px;
+            padding: 6px 16px;
+            font-size: 1rem;
+            font-weight: 600;
+            color: #0f2a41;
+            display: inline-block;
+        }
+    </style>
+</head>
+<body>
+    <div class="game-card">
+        <div style="display: flex; align-items: center; justify-content: space-between;">
+            <h1>🔤 SCRAMBLE<span>free</span></h1>
+            <div class="score-badge" id="scoreDisplay">0</div>
+        </div>
+        <p style="color: #4a5f73; margin-bottom: 8px;">unscramble the word — no ads needed</p>
+
+        <div class="scrambled-box">
+            <div id="scrambledWord">......</div>
+        </div>
+
+        <div class="input-area">
+            <input type="text" id="guessInput" placeholder="YOUR GUESS" maxlength="20" autocomplete="off">
+            <button class="primary-btn" id="submitGuess">GUESS</button>
+        </div>
+
+        <div id="message" class="message">✨ type your answer</div>
+
+        <!-- rewarded ad buttons – clearly labeled -->
+        <div class="reward-row">
+            <button class="reward-btn" id="hintBtn"><i>🔍</i> Hint (watch ad)</button>
+            <button class="reward-btn" id="skipBtn"><i>🌀</i> Skip word (watch ad)</button>
+        </div>
+
+        <footer>
+            <a href="#" target="_blank" id="privacyLink">📄 Privacy Policy</a>
+            <span>v1.0</span>
+        </footer>
+    </div>
+
+    <!-- Adsgram script – REPLACE YOUR_PUBLISHER_ID -->
+    <script src="https://s.delivery.adsgram.ai/adsgram.min.js?pid=YOUR_PUBLISHER_ID"></script>
+
+    <script>
+        (function() {
+            // ---------- WORD LIST (original, no copyright issues) ----------
+            const words = [
+                "PLANET", "MOUNTAIN", "COFFEE", "WINDOW", "GALAXY", 
+                "PYTHON", "JOURNEY", "HARMONY", "VELVET", "CRYSTAL",
+                "THUNDER", "MEADOW", "SAFARI", "POCKET", "BRAIN",
+                "FLAMINGO", "KITTEN", "PUZZLE", "RIDDLE", "SUMMER",
+                "WINTER", "AUTUMN", "SPRING", "CLOUD", "RIVER",
+                "HORIZON", "DIAMOND", "SILVER", "GARDEN", "BREEZE"
+            ];
+
+            // Game state
+            let currentWord = "";
+            let scrambled = "";
+            let score = 0;
+
+            // DOM elements
+            const scrambledEl = document.getElementById('scrambledWord');
+            const guessInput = document.getElementById('guessInput');
+            const submitBtn = document.getElementById('submitGuess');
+            const messageEl = document.getElementById('message');
+            const scoreEl = document.getElementById('scoreDisplay');
+            const hintBtn = document.getElementById('hintBtn');
+            const skipBtn = document.getElementById('skipBtn');
+
+            // ---------- helper: shuffle word ----------
+            function shuffleWord(word) {
+                const arr = word.split('');
+                for (let i = arr.length - 1; i > 0; i--) {
+                    const j = Math.floor(Math.random() * (i + 1));
+                    [arr[i], arr[j]] = [arr[j], arr[i]];
+                }
+                return arr.join('');
+            }
+
+            // ---------- load a new random word ----------
+            function nextWord() {
+                const randomIndex = Math.floor(Math.random() * words.length);
+                currentWord = words[randomIndex].toUpperCase();
+                scrambled = shuffleWord(currentWord);
+                scrambledEl.innerText = scrambled;
+                guessInput.value = '';
+                messageEl.innerText = '🔎 new word!';
+                // enable everything (ad buttons remain enabled)
+            }
+
+            // ---------- update score display ----------
+            function updateScore() {
+                scoreEl.innerText = score;
+            }
+
+            // ---------- handle guess ----------
+            function checkGuess() {
+                const guess = guessInput.value.trim().toUpperCase();
+                if (guess === '') {
+                    messageEl.innerText = '✏️ type your guess first';
+                    return;
+                }
+                if (guess === currentWord) {
+                    messageEl.innerText = '✅ CORRECT! +1 point';
+                    score++;
+                    updateScore();
+                    nextWord();
+                } else {
+                    messageEl.innerText = '❌ not correct, try again';
+                }
+                guessInput.value = ''; // optional clear
+            }
+
+            submitBtn.addEventListener('click', checkGuess);
+            guessInput.addEventListener('keypress', (e) => {
+                if (e.key === 'Enter') checkGuess();
+            });
+
+            // ---------- ADSGRAM INTEGRATION (rewarded ads) ----------
+            // IMPORTANT: replace 'YOUR_BLOCK_ID' with your actual block ID from Adsgram
+            let adController = null;
+            try {
+                adController = window.Adsgram?.init({ blockId: "YOUR_BLOCK_ID" });
+            } catch (e) {
+                console.warn("Adsgram init error", e);
+            }
+
+            //通用 function to show rewarded ad and then execute callback
+            function showRewardAd(callback) {
+                if (!adController) {
+                    alert("Ads not ready. Please try again later.");
+                    return;
+                }
+                adController.show().then(() => {
+                    // Ad successfully viewed
+                    callback();
+                }).catch((result) => {
+                    // Ad was not displayed or user skipped
+                    console.log('Ad error/abort:', result);
+                    alert('Ad could not be shown (maybe skipped or unavailable).');
+                });
+            }
+
+            // Hint button: reveal first letter
+            hintBtn.addEventListener('click', () => {
+                showRewardAd(() => {
+                    const firstLetter = currentWord[0];
+                    messageEl.innerText = `🔍 Hint: first letter is “${firstLetter}”`;
+                });
+            });
+
+            // Skip button: get a brand new word (no score penalty)
+            skipBtn.addEventListener('click', () => {
+                showRewardAd(() => {
+                    nextWord();
+                    messageEl.innerText = '✨ skipped to new word';
+                });
+            });
+
+            // ---------- start the game ----------
+            nextWord();
+
+            // ---------- (optional) update privacy link – replace with your real URL ----------
+            document.getElementById('privacyLink').href = '#'; // change to your actual privacy page
+        })();
+    </script>
+
+    <!-- small note for compliance -->
+    <!-- 
+        This game is fully playable without ads. 
+        Rewarded ads are clearly labeled and optional.
+        Basic functions (guessing, new words) are free.
+        Replace Adsgram IDs and privacy link before going live.
+    -->
+</body>
+</html>
