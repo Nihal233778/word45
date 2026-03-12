@@ -155,6 +155,64 @@
             font-style: normal;
             font-size: 1.3rem;
         }
+        .ad-section-title {
+            font-size: 0.9rem;
+            color: #1a3b5d;
+            margin: 20px 0 10px;
+            text-align: center;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            opacity: 0.8;
+        }
+        .interstitial-btn {
+            background: #9b59b6;
+            border: none;
+            color: white;
+            font-weight: 600;
+            font-size: 1.1rem;
+            padding: 14px 24px;
+            border-radius: 40px;
+            cursor: pointer;
+            box-shadow: 0 5px 0 #6c3483;
+            transition: 0.07s linear;
+            width: 100%;
+            border: 1px solid #c39bd3;
+        }
+        .interstitial-btn:active {
+            transform: translateY(4px);
+            box-shadow: 0 1px 0 #6c3483;
+        }
+        .task-btn {
+            background: #27ae60;
+            border: none;
+            color: white;
+            font-weight: 600;
+            font-size: 1.1rem;
+            padding: 14px 24px;
+            border-radius: 40px;
+            cursor: pointer;
+            box-shadow: 0 5px 0 #1e8449;
+            transition: 0.07s linear;
+            width: 100%;
+            border: 1px solid #6fcf97;
+        }
+        .task-btn:active {
+            transform: translateY(4px);
+            box-shadow: 0 1px 0 #1e8449;
+        }
+        .task-btn:disabled {
+            opacity: 0.5;
+            transform: none;
+            box-shadow: 0 5px 0 #1e8449;
+            pointer-events: none;
+        }
+        .interstitial-btn:disabled {
+            opacity: 0.5;
+            transform: none;
+            box-shadow: 0 5px 0 #6c3483;
+            pointer-events: none;
+        }
         footer {
             margin-top: 30px;
             font-size: 0.85rem;
@@ -182,6 +240,14 @@
             color: #0f2a41;
             display: inline-block;
         }
+        .block-id-badge {
+            font-size: 0.7rem;
+            background: rgba(26, 59, 93, 0.1);
+            padding: 4px 8px;
+            border-radius: 20px;
+            margin: 5px 0;
+            color: #1a3b5d;
+        }
     </style>
 </head>
 <body>
@@ -203,11 +269,20 @@
 
         <div id="message" class="message">✨ type your answer</div>
 
-        <!-- rewarded ad buttons – clearly labeled -->
+        <!-- REWARDED ADS (24919) - User gets reward after watching -->
+        <div class="ad-section-title">🎁 REWARDED ADS (block: 24919)</div>
         <div class="reward-row">
             <button class="reward-btn" id="hintBtn"><i>🔍</i> Hint (watch ad)</button>
             <button class="reward-btn" id="skipBtn"><i>🌀</i> Skip word (watch ad)</button>
         </div>
+
+        <!-- INTERSTITIAL ADS (int-24917) - Can be skipped -->
+        <div class="ad-section-title">📺 INTERSTITIAL ADS (block: int-24917)</div>
+        <button class="interstitial-btn" id="interstitialBtn">🎮 Play Interstitial Ad (optional)</button>
+
+        <!-- TASK ADS (task-24920) - No initialization needed -->
+        <div class="ad-section-title">📋 TASK ADS (block: task-24920)</div>
+        <button class="task-btn" id="taskBtn">✅ Complete Task Ad</button>
 
         <footer>
             <a href="#" target="_blank" id="privacyLink">📄 Privacy Policy</a>
@@ -215,12 +290,21 @@
         </footer>
     </div>
 
-    <!-- Adsgram script – REPLACE YOUR_PUBLISHER_ID -->
-    <script src="https://s.delivery.adsgram.ai/adsgram.min.js?pid=YOUR_PUBLISHER_ID"></script>
+    <!-- Adsgram SDK - Place in head as per documentation -->
+    <script src="https://sad.adsgram.ai/js/sad.min.js"></script>
 
     <script>
         (function() {
-            // ---------- WORD LIST (original, no copyright issues) ----------
+            // ====================================================
+            // YOUR BLOCK IDS
+            // ====================================================
+            const REWARD_BLOCK_ID = "24919";        // Rewarded ad format
+            const INTERSTITIAL_BLOCK_ID = "int-24917"; // Interstitial ad format
+            const TASK_BLOCK_ID = "task-24920";      // Task ad format (no initialization needed)
+            
+            // ====================================================
+            // WORD LIST
+            // ====================================================
             const words = [
                 "PLANET", "MOUNTAIN", "COFFEE", "WINDOW", "GALAXY", 
                 "PYTHON", "JOURNEY", "HARMONY", "VELVET", "CRYSTAL",
@@ -234,6 +318,8 @@
             let currentWord = "";
             let scrambled = "";
             let score = 0;
+            let rewardedController = null;
+            let interstitialController = null;
 
             // DOM elements
             const scrambledEl = document.getElementById('scrambledWord');
@@ -243,8 +329,139 @@
             const scoreEl = document.getElementById('scoreDisplay');
             const hintBtn = document.getElementById('hintBtn');
             const skipBtn = document.getElementById('skipBtn');
+            const interstitialBtn = document.getElementById('interstitialBtn');
+            const taskBtn = document.getElementById('taskBtn');
 
-            // ---------- helper: shuffle word ----------
+            // ====================================================
+            // INITIALIZE ADSGRAM SDK - Only for rewarded and interstitial
+            // Task format does NOT need initialization (per docs)
+            // ====================================================
+            function initAdsgram() {
+                try {
+                    if (window.Adsgram) {
+                        // Initialize Rewarded Ad Controller (24919)
+                        rewardedController = window.Adsgram.init({ 
+                            blockId: REWARD_BLOCK_ID 
+                        });
+                        console.log('✅ Rewarded ads initialized:', REWARD_BLOCK_ID);
+                        
+                        // Initialize Interstitial Ad Controller (int-24917)
+                        interstitialController = window.Adsgram.init({ 
+                            blockId: INTERSTITIAL_BLOCK_ID 
+                        });
+                        console.log('✅ Interstitial ads initialized:', INTERSTITIAL_BLOCK_ID);
+                        
+                    } else {
+                        console.error('❌ Adsgram SDK not loaded');
+                        setTimeout(initAdsgram, 1000);
+                    }
+                } catch (error) {
+                    console.error('❌ Adsgram init error:', error);
+                }
+            }
+
+            // Initialize when page loads
+            initAdsgram();
+
+            // ====================================================
+            // SHOW REWARDED AD (24919)
+            // ====================================================
+            function showRewardedAd(rewardCallback) {
+                if (!rewardedController) {
+                    alert('Rewarded ads not ready. Please try again.');
+                    return;
+                }
+
+                messageEl.innerText = '⏳ Loading rewarded ad...';
+                
+                rewardedController.show()
+                    .then((result) => {
+                        console.log('✅ Rewarded ad completed:', result);
+                        
+                        if (result.done) {
+                            // User watched till the end - give reward
+                            if (rewardCallback) rewardCallback();
+                            messageEl.innerText = '✨ Thanks! Here\'s your reward:';
+                        } else {
+                            messageEl.innerText = '❌ Ad not completed. No reward.';
+                        }
+                    })
+                    .catch((result) => {
+                        console.log('❌ Rewarded ad error:', result);
+                        messageEl.innerText = '❌ Ad failed. Try again?';
+                    });
+            }
+
+            // ====================================================
+            // SHOW INTERSTITIAL AD (int-24917)
+            // User can skip before end - promise resolves when closed
+            // ====================================================
+            function showInterstitialAd() {
+                if (!interstitialController) {
+                    alert('Interstitial ads not ready. Please try again.');
+                    return;
+                }
+
+                messageEl.innerText = '⏳ Loading interstitial ad...';
+                
+                interstitialController.show()
+                    .then((result) => {
+                        // For interstitial, promise resolves even if user closes early
+                        console.log('✅ Interstitial ad completed/closed:', result);
+                        
+                        if (result.done) {
+                            messageEl.innerText = '📺 Ad watched completely!';
+                        } else {
+                            messageEl.innerText = '📺 Ad closed. Thanks!';
+                        }
+                        
+                        // Bonus: give a small reward for interstitial too
+                        score++;
+                        updateScore();
+                        messageEl.innerText += ' +1 bonus point!';
+                    })
+                    .catch((result) => {
+                        console.log('❌ Interstitial ad error:', result);
+                        messageEl.innerText = '❌ Interstitial ad failed.';
+                    });
+            }
+
+            // ====================================================
+            // SHOW TASK AD (task-24920)
+            // IMPORTANT: Task format does NOT need initialization (per docs)
+            // We use the TaskAd API directly
+            // ====================================================
+            function showTaskAd() {
+                if (!window.Adsgram || !window.Adsgram.TaskAd) {
+                    alert('Task ads not available. Please try again.');
+                    return;
+                }
+
+                messageEl.innerText = '⏳ Loading task ad...';
+                
+                // Task ad format - different API
+                const taskAd = window.Adsgram.TaskAd.init({ 
+                    blockId: TASK_BLOCK_ID 
+                });
+                
+                taskAd.show()
+                    .then((result) => {
+                        console.log('✅ Task ad completed:', result);
+                        messageEl.innerText = '✅ Task completed! +2 bonus points!';
+                        
+                        // Give bonus for completing task
+                        score += 2;
+                        updateScore();
+                    })
+                    .catch((result) => {
+                        console.log('❌ Task ad error:', result);
+                        messageEl.innerText = '❌ Task failed. Try again?';
+                    });
+            }
+
+            // ====================================================
+            // GAME FUNCTIONS
+            // ====================================================
             function shuffleWord(word) {
                 const arr = word.split('');
                 for (let i = arr.length - 1; i > 0; i--) {
@@ -254,7 +471,6 @@
                 return arr.join('');
             }
 
-            // ---------- load a new random word ----------
             function nextWord() {
                 const randomIndex = Math.floor(Math.random() * words.length);
                 currentWord = words[randomIndex].toUpperCase();
@@ -262,15 +478,12 @@
                 scrambledEl.innerText = scrambled;
                 guessInput.value = '';
                 messageEl.innerText = '🔎 new word!';
-                // enable everything (ad buttons remain enabled)
             }
 
-            // ---------- update score display ----------
             function updateScore() {
                 scoreEl.innerText = score;
             }
 
-            // ---------- handle guess ----------
             function checkGuess() {
                 const guess = guessInput.value.trim().toUpperCase();
                 if (guess === '') {
@@ -285,69 +498,60 @@
                 } else {
                     messageEl.innerText = '❌ not correct, try again';
                 }
-                guessInput.value = ''; // optional clear
+                guessInput.value = '';
             }
 
+            // ====================================================
+            // EVENT LISTENERS
+            // ====================================================
+            
+            // Game buttons
             submitBtn.addEventListener('click', checkGuess);
             guessInput.addEventListener('keypress', (e) => {
                 if (e.key === 'Enter') checkGuess();
             });
 
-            // ---------- ADSGRAM INTEGRATION (rewarded ads) ----------
-            // IMPORTANT: replace 'YOUR_BLOCK_ID' with your actual block ID from Adsgram
-            let adController = null;
-            try {
-                adController = window.Adsgram?.init({ blockId: "YOUR_BLOCK_ID" });
-            } catch (e) {
-                console.warn("Adsgram init error", e);
-            }
-
-            //通用 function to show rewarded ad and then execute callback
-            function showRewardAd(callback) {
-                if (!adController) {
-                    alert("Ads not ready. Please try again later.");
-                    return;
-                }
-                adController.show().then(() => {
-                    // Ad successfully viewed
-                    callback();
-                }).catch((result) => {
-                    // Ad was not displayed or user skipped
-                    console.log('Ad error/abort:', result);
-                    alert('Ad could not be shown (maybe skipped or unavailable).');
-                });
-            }
-
-            // Hint button: reveal first letter
+            // Rewarded ad buttons (24919)
             hintBtn.addEventListener('click', () => {
-                showRewardAd(() => {
+                showRewardedAd(() => {
                     const firstLetter = currentWord[0];
                     messageEl.innerText = `🔍 Hint: first letter is “${firstLetter}”`;
                 });
             });
 
-            // Skip button: get a brand new word (no score penalty)
             skipBtn.addEventListener('click', () => {
-                showRewardAd(() => {
+                showRewardedAd(() => {
                     nextWord();
                     messageEl.innerText = '✨ skipped to new word';
                 });
             });
 
-            // ---------- start the game ----------
-            nextWord();
+            // Interstitial ad button (int-24917)
+            interstitialBtn.addEventListener('click', showInterstitialAd);
 
-            // ---------- (optional) update privacy link – replace with your real URL ----------
-            document.getElementById('privacyLink').href = '#'; // change to your actual privacy page
+            // Task ad button (task-24920)
+            taskBtn.addEventListener('click', showTaskAd);
+
+            // ====================================================
+            // INITIALIZATION
+            // ====================================================
+            
+            // Start the game
+            nextWord();
+            
+            // Update privacy link
+            document.getElementById('privacyLink').href = '#'; // Replace with your privacy policy URL
+
+            // Telegram Mini App integration (optional)
+            if (window.Telegram?.WebApp) {
+                window.Telegram.WebApp.ready();
+                window.Telegram.WebApp.expand();
+            }
+
         })();
     </script>
 
-    <!-- small note for compliance -->
-    <!-- 
-        This game is fully playable without ads. 
-        Rewarded ads are clearly labeled and optional.
-        Basic functions (guessing, new words) are free.
-        Replace Adsgram IDs and privacy link before going live.
-    -->
+    <!-- Telegram Web App script (optional) -->
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
 </body>
 </html>
