@@ -360,7 +360,7 @@
                         // Initialize Rewarded Ad Controller (24919) with debug mode
                         rewardedController = window.Adsgram.init({ 
                             blockId: REWARD_BLOCK_ID,
-                            debug: true,  // DEBUG MODE ENABLED - shows test ads
+                            debug: false,  // DEBUG MODE ENABLED - shows test ads
                             debugBannerType: "RewardedVideo"  // Type of test ad
                         });
                         console.log('✅ Rewarded ads initialized (debug mode):', REWARD_BLOCK_ID);
@@ -368,7 +368,7 @@
                         // Initialize Interstitial Ad Controller (int-24917) with debug mode
                         interstitialController = window.Adsgram.init({ 
                             blockId: INTERSTITIAL_BLOCK_ID,
-                            debug: true,  // DEBUG MODE ENABLED
+                            debug: false,  // DEBUG MODE ENABLED
                             debugBannerType: "FullscreenMedia"  // Type of test ad
                         });
                         console.log('✅ Interstitial ads initialized (debug mode):', INTERSTITIAL_BLOCK_ID);
@@ -597,3 +597,4 @@
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
 </body>
 </html>
+
