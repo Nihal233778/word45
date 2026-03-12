@@ -210,13 +210,38 @@
             margin-left: 8px;
             text-transform: uppercase;
         }
-        .debug-info {
+        .debug-panel {
             background: #f0f0f0;
+            border: 1px solid #ccc;
             border-radius: 8px;
-            padding: 10px;
-            margin: 10px 0;
+            padding: 12px;
+            margin: 15px 0;
+            font-size: 0.85rem;
+            text-align: left;
+        }
+        .debug-panel h4 {
+            margin-bottom: 8px;
+            color: #1a3b5d;
+        }
+        .debug-btn {
+            background: #3498db;
+            color: white;
+            border: none;
+            padding: 8px 12px;
+            border-radius: 20px;
+            cursor: pointer;
             font-size: 0.8rem;
-            border-left: 4px solid #ff6b6b;
+            margin-right: 8px;
+            margin-bottom: 8px;
+        }
+        .debug-btn:hover {
+            background: #2980b9;
+        }
+        .log-entry {
+            font-family: monospace;
+            font-size: 0.75rem;
+            border-bottom: 1px solid #ddd;
+            padding: 4px 0;
         }
         footer {
             margin-top: 30px;
@@ -245,14 +270,16 @@
             color: #0f2a41;
             display: inline-block;
         }
-        .block-id-badge {
-            font-size: 0.7rem;
-            background: rgba(26, 59, 93, 0.1);
-            padding: 4px 8px;
-            border-radius: 20px;
-            margin: 5px 0;
-            color: #1a3b5d;
+        .status-indicator {
+            display: inline-block;
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            margin-right: 5px;
         }
+        .status-green { background: #2ecc71; }
+        .status-red { background: #e74c3c; }
+        .status-yellow { background: #f39c12; }
     </style>
 </head>
 <body>
@@ -263,10 +290,19 @@
         </div>
         <p style="color: #4a5f73; margin-bottom: 8px;">unscramble the word — no ads needed</p>
 
-        <!-- Debug Mode Notice -->
-        <div class="debug-info">
-            🔧 <strong>DEBUG MODE ENABLED</strong> - Test ads will show<br>
-            Blocks: 24919 (reward) | int-24917 (interstitial) | task-24920 (task)
+        <!-- Debug Panel -->
+        <div class="debug-panel">
+            <h4>🛠️ DEBUG INFORMATION</h4>
+            <div id="debugStatus">Initializing...</div>
+            <div style="margin-top: 10px;">
+                <button class="debug-btn" id="testRewardedBtn">Test Rewarded Ad</button>
+                <button class="debug-btn" id="testInterstitialBtn">Test Interstitial</button>
+                <button class="debug-btn" id="testTaskBtn">Test Task Ad</button>
+                <button class="debug-btn" id="checkCampaignsBtn">Check Campaigns</button>
+            </div>
+            <div style="margin-top: 10px; max-height: 100px; overflow-y: auto;" id="logContainer">
+                <div class="log-entry">Ready for actions...</div>
+            </div>
         </div>
 
         <div class="scrambled-box">
@@ -280,7 +316,7 @@
 
         <div id="message" class="message">✨ type your answer</div>
 
-        <!-- REWARDED ADS (24919) - User gets reward after watching -->
+        <!-- REWARDED ADS (24919) -->
         <div class="ad-section-title">
             🎁 REWARDED ADS <span class="debug-badge">24919</span>
         </div>
@@ -289,13 +325,13 @@
             <button class="reward-btn" id="skipBtn"><i>🌀</i> Skip word (watch ad)</button>
         </div>
 
-        <!-- INTERSTITIAL ADS (int-24917) - Can be skipped -->
+        <!-- INTERSTITIAL ADS (int-24917) -->
         <div class="ad-section-title">
             📺 INTERSTITIAL ADS <span class="debug-badge">int-24917</span>
         </div>
         <button class="interstitial-btn" id="interstitialBtn">🎮 Show Interstitial Ad</button>
 
-        <!-- TASK ADS (task-24920) - No initialization needed -->
+        <!-- TASK ADS (task-24920) -->
         <div class="ad-section-title">
             📋 TASK ADS <span class="debug-badge">task-24920</span>
         </div>
@@ -303,7 +339,7 @@
 
         <footer>
             <a href="#" target="_blank" id="privacyLink">📄 Privacy Policy</a>
-            <span>v1.0 (debug)</span>
+            <span>v1.0</span>
         </footer>
     </div>
 
@@ -318,6 +354,11 @@
             const REWARD_BLOCK_ID = "24919";           // Rewarded ad format
             const INTERSTITIAL_BLOCK_ID = "int-24917";  // Interstitial ad format
             const TASK_BLOCK_ID = "task-24920";         // Task ad format
+            
+            // ====================================================
+            // PRODUCTION MODE - Set to false for real ads
+            // ====================================================
+            const DEBUG_MODE = false;  // false = real ads, true = test ads
             
             // ====================================================
             // WORD LIST
@@ -348,41 +389,118 @@
             const skipBtn = document.getElementById('skipBtn');
             const interstitialBtn = document.getElementById('interstitialBtn');
             const taskBtn = document.getElementById('taskBtn');
+            
+            // Debug elements
+            const debugStatus = document.getElementById('debugStatus');
+            const logContainer = document.getElementById('logContainer');
 
             // ====================================================
-            // INITIALIZE ADSGRAM SDK WITH DEBUG MODE ENABLED
+            // LOGGING FUNCTION
+            // ====================================================
+            function addLog(message, type = 'info') {
+                const logEntry = document.createElement('div');
+                logEntry.className = 'log-entry';
+                const timestamp = new Date().toLocaleTimeString();
+                
+                let color = '#333';
+                if (type === 'success') color = '#27ae60';
+                if (type === 'error') color = '#e74c3c';
+                if (type === 'warning') color = '#f39c12';
+                
+                logEntry.innerHTML = `<span style="color: ${color};">[${timestamp}] ${message}</span>`;
+                logContainer.appendChild(logEntry);
+                logContainer.scrollTop = logContainer.scrollHeight;
+                
+                console.log(`[${type}] ${message}`);
+            }
+
+            // ====================================================
+            // INITIALIZE ADSGRAM SDK WITH EVENT LISTENERS
             // ====================================================
             function initAdsgram() {
                 try {
                     if (window.Adsgram) {
-                        console.log('✅ Adsgram SDK loaded, initializing with DEBUG MODE...');
+                        debugStatus.innerHTML = '<span class="status-indicator status-green"></span> Adsgram SDK loaded';
+                        addLog(`✅ Adsgram SDK loaded, DEBUG_MODE: ${DEBUG_MODE ? 'ON (test ads)' : 'OFF (real ads)'}`, 'success');
                         
-                        // Initialize Rewarded Ad Controller (24919) with debug mode
+                        // ========================================
+                        // Initialize Rewarded Ad Controller (24919)
+                        // ========================================
                         rewardedController = window.Adsgram.init({ 
                             blockId: REWARD_BLOCK_ID,
-                            debug: false,  // DEBUG MODE ENABLED - shows test ads
-                            debugBannerType: "RewardedVideo"  // Type of test ad
+                            debug: DEBUG_MODE,
+                            debugBannerType: "RewardedVideo"
                         });
-                        console.log('✅ Rewarded ads initialized (debug mode):', REWARD_BLOCK_ID);
                         
-                        // Initialize Interstitial Ad Controller (int-24917) with debug mode
+                        // Add event listeners for rewarded ads
+                        rewardedController.addEventListener('onBannerNotFound', () => {
+                            addLog('🔍 EVENT: onBannerNotFound - No ad available for this request', 'warning');
+                            addLog('   → Campaigns active but no match for your profile/region/time', 'warning');
+                            messageEl.innerText = 'No ads match your profile right now';
+                        });
+                        
+                        rewardedController.addEventListener('onStart', () => {
+                            addLog('✅ EVENT: onStart - Ad started playing', 'success');
+                        });
+                        
+                        rewardedController.addEventListener('onComplete', () => {
+                            addLog('✅ EVENT: onComplete - Ad finished', 'success');
+                        });
+                        
+                        rewardedController.addEventListener('onReward', () => {
+                            addLog('🎁 EVENT: onReward - User should get reward', 'success');
+                        });
+                        
+                        rewardedController.addEventListener('onSkip', () => {
+                            addLog('⏭️ EVENT: onSkip - User closed ad early', 'warning');
+                        });
+                        
+                        rewardedController.addEventListener('onError', (result) => {
+                            addLog(`❌ EVENT: onError - ${result.description || 'Unknown error'}`, 'error');
+                        });
+                        
+                        addLog('✅ Rewarded ads initialized with event listeners', 'success');
+                        
+                        // ========================================
+                        // Initialize Interstitial Ad Controller (int-24917)
+                        // ========================================
                         interstitialController = window.Adsgram.init({ 
                             blockId: INTERSTITIAL_BLOCK_ID,
-                            debug: false,  // DEBUG MODE ENABLED
-                            debugBannerType: "FullscreenMedia"  // Type of test ad
+                            debug: DEBUG_MODE,
+                            debugBannerType: "FullscreenMedia"
                         });
-                        console.log('✅ Interstitial ads initialized (debug mode):', INTERSTITIAL_BLOCK_ID);
                         
-                        messageEl.innerText = '✅ Ads ready! Click any ad button to test';
+                        // Add event listeners for interstitial
+                        interstitialController.addEventListener('onBannerNotFound', () => {
+                            addLog('🔍 Interstitial: No ad available', 'warning');
+                        });
+                        
+                        interstitialController.addEventListener('onStart', () => {
+                            addLog('✅ Interstitial: Ad started', 'success');
+                        });
+                        
+                        interstitialController.addEventListener('onComplete', () => {
+                            addLog('✅ Interstitial: Ad completed', 'success');
+                        });
+                        
+                        interstitialController.addEventListener('onError', (result) => {
+                            addLog(`❌ Interstitial error: ${result.description}`, 'error');
+                        });
+                        
+                        addLog('✅ Interstitial ads initialized with event listeners', 'success');
+                        
+                        messageEl.innerText = DEBUG_MODE ? 
+                            '🧪 Test mode active' : 
+                            '📺 Real ads mode - waiting for campaigns';
                         
                     } else {
-                        console.error('❌ Adsgram SDK not loaded, retrying...');
-                        messageEl.innerText = '⏳ Loading ads...';
+                        debugStatus.innerHTML = '<span class="status-indicator status-red"></span> Adsgram SDK not loaded';
+                        addLog('❌ Adsgram SDK not loaded, retrying...', 'error');
                         setTimeout(initAdsgram, 1000);
                     }
                 } catch (error) {
-                    console.error('❌ Adsgram init error:', error);
-                    messageEl.innerText = '❌ Ads failed to load';
+                    debugStatus.innerHTML = '<span class="status-indicator status-red"></span> Initialization error';
+                    addLog(`❌ Adsgram init error: ${error.message}`, 'error');
                 }
             }
 
@@ -390,7 +508,7 @@
             initAdsgram();
 
             // ====================================================
-            // SHOW REWARDED AD (24919) - WITH DEBUG
+            // SHOW REWARDED AD
             // ====================================================
             function showRewardedAd(rewardCallback) {
                 if (!rewardedController) {
@@ -398,33 +516,43 @@
                     return;
                 }
 
-                messageEl.innerText = '⏳ Loading rewarded ad (debug mode)...';
-                console.log('🎬 Showing rewarded ad...');
+                addLog('🎬 Attempting to show rewarded ad...', 'info');
+                messageEl.innerText = '⏳ Loading rewarded ad...';
                 
                 rewardedController.show()
                     .then((result) => {
-                        console.log('✅ Rewarded ad completed:', result);
-                        console.log('   - done:', result.done);
-                        console.log('   - state:', result.state);
+                        addLog(`✅ Rewarded ad completed: ${JSON.stringify(result)}`, 'success');
                         
                         if (result.done) {
-                            // User watched till the end - give reward
+                            addLog('🎁 Ad watched till end - giving reward', 'success');
                             if (rewardCallback) rewardCallback();
-                            messageEl.innerText = '✨ Thanks for watching! Here\'s your reward:';
+                            messageEl.innerText = '✨ Thanks! Here\'s your reward:';
                         } else {
+                            addLog('❌ Ad not completed - no reward', 'warning');
                             messageEl.innerText = '❌ Ad not completed. No reward.';
                         }
                     })
                     .catch((result) => {
-                        console.log('❌ Rewarded ad error:', result);
-                        console.log('   - error:', result.error);
-                        console.log('   - description:', result.description);
-                        messageEl.innerText = '❌ Ad failed. Try again?';
+                        addLog(`❌ Rewarded ad error: ${result.description || 'Unknown error'}`, 'error');
+                        
+                        if (result.description) {
+                            if (result.description.includes('No fill')) {
+                                messageEl.innerText = '📺 No ads available for your region/time';
+                                addLog('   → This means campaigns are active but no match for your profile', 'warning');
+                            } else if (result.description.includes('Invalid block')) {
+                                messageEl.innerText = '❌ Block ID issue - check dashboard';
+                                addLog('   → Block ID may be incorrect or inactive', 'error');
+                            } else {
+                                messageEl.innerText = `❌ ${result.description}`;
+                            }
+                        } else {
+                            messageEl.innerText = '❌ Ad failed. Try again?';
+                        }
                     });
             }
 
             // ====================================================
-            // SHOW INTERSTITIAL AD (int-24917) - WITH DEBUG
+            // SHOW INTERSTITIAL AD
             // ====================================================
             function showInterstitialAd() {
                 if (!interstitialController) {
@@ -432,14 +560,12 @@
                     return;
                 }
 
-                messageEl.innerText = '⏳ Loading interstitial ad (debug mode)...';
-                console.log('🎬 Showing interstitial ad...');
+                addLog('🎬 Attempting to show interstitial ad...', 'info');
+                messageEl.innerText = '⏳ Loading interstitial ad...';
                 
                 interstitialController.show()
                     .then((result) => {
-                        console.log('✅ Interstitial ad completed/closed:', result);
-                        console.log('   - done:', result.done);
-                        console.log('   - state:', result.state);
+                        addLog(`✅ Interstitial ad completed: ${JSON.stringify(result)}`, 'success');
                         
                         if (result.done) {
                             messageEl.innerText = '📺 Ad watched completely! +1 bonus!';
@@ -447,20 +573,22 @@
                             messageEl.innerText = '📺 Ad closed. +1 bonus!';
                         }
                         
-                        // Give bonus point for interstitial
                         score++;
                         updateScore();
                     })
                     .catch((result) => {
-                        console.log('❌ Interstitial ad error:', result);
-                        console.log('   - error:', result.error);
-                        console.log('   - description:', result.description);
-                        messageEl.innerText = '❌ Interstitial ad failed.';
+                        addLog(`❌ Interstitial ad error: ${result.description || 'Unknown error'}`, 'error');
+                        
+                        if (result.description && result.description.includes('No fill')) {
+                            messageEl.innerText = '📺 No interstitial ads available';
+                        } else {
+                            messageEl.innerText = '❌ Interstitial ad failed.';
+                        }
                     });
             }
 
             // ====================================================
-            // SHOW TASK AD (task-24920) - WITH DEBUG
+            // SHOW TASK AD
             // ====================================================
             function showTaskAd() {
                 if (!window.Adsgram || !window.Adsgram.TaskAd) {
@@ -468,28 +596,64 @@
                     return;
                 }
 
-                messageEl.innerText = '⏳ Loading task ad (debug mode)...';
-                console.log('🎬 Showing task ad...');
+                addLog('🎬 Attempting to show task ad...', 'info');
+                messageEl.innerText = '⏳ Loading task ad...';
                 
-                // Task ad format - different API
                 const taskAd = window.Adsgram.TaskAd.init({ 
                     blockId: TASK_BLOCK_ID,
-                    debug: true  // Task ads also support debug mode
+                    debug: DEBUG_MODE
                 });
                 
                 taskAd.show()
                     .then((result) => {
-                        console.log('✅ Task ad completed:', result);
+                        addLog(`✅ Task ad completed: ${JSON.stringify(result)}`, 'success');
                         messageEl.innerText = '✅ Task completed! +2 bonus points!';
                         
-                        // Give bonus for completing task
                         score += 2;
                         updateScore();
                     })
                     .catch((result) => {
-                        console.log('❌ Task ad error:', result);
-                        messageEl.innerText = '❌ Task failed. Try again?';
+                        addLog(`❌ Task ad error: ${result.description || 'Unknown error'}`, 'error');
+                        
+                        if (result.description && result.description.includes('No fill')) {
+                            messageEl.innerText = '📺 No task ads available';
+                        } else {
+                            messageEl.innerText = '❌ Task failed. Try again?';
+                        }
                     });
+            }
+
+            // ====================================================
+            // CHECK CAMPAIGN STATUS
+            // ====================================================
+            function checkCampaigns() {
+                addLog('🔍 Checking campaign status...', 'info');
+                addLog(`Block IDs:`, 'info');
+                addLog(`  - Rewarded: ${REWARD_BLOCK_ID}`, 'info');
+                addLog(`  - Interstitial: ${INTERSTITIAL_BLOCK_ID}`, 'info');
+                addLog(`  - Task: ${TASK_BLOCK_ID}`, 'info');
+                
+                if (rewardedController) {
+                    addLog('✅ Rewarded controller: Initialized', 'success');
+                } else {
+                    addLog('❌ Rewarded controller: Not initialized', 'error');
+                }
+                
+                if (interstitialController) {
+                    addLog('✅ Interstitial controller: Initialized', 'success');
+                } else {
+                    addLog('❌ Interstitial controller: Not initialized', 'error');
+                }
+                
+                addLog(`Current mode: ${DEBUG_MODE ? 'TEST ADS' : 'REAL ADS'}`, 'info');
+                
+                if (!DEBUG_MODE) {
+                    addLog('⚠️ No ads appearing with real mode usually means:', 'warning');
+                    addLog('   1. Geographic targeting - advertisers not targeting your country', 'warning');
+                    addLog('   2. Time targeting - campaigns run at specific hours', 'warning');
+                    addLog('   3. Fill rate - even active campaigns have limited impressions', 'warning');
+                    addLog('   4. Try switching debug: true to confirm ads work', 'warning');
+                }
             }
 
             // ====================================================
@@ -544,7 +708,7 @@
                 if (e.key === 'Enter') checkGuess();
             });
 
-            // Rewarded ad buttons (24919)
+            // Rewarded ad buttons
             hintBtn.addEventListener('click', () => {
                 showRewardedAd(() => {
                     const firstLetter = currentWord[0];
@@ -559,11 +723,22 @@
                 });
             });
 
-            // Interstitial ad button (int-24917)
+            // Interstitial ad button
             interstitialBtn.addEventListener('click', showInterstitialAd);
 
-            // Task ad button (task-24920)
+            // Task ad button
             taskBtn.addEventListener('click', showTaskAd);
+
+            // Debug buttons
+            document.getElementById('testRewardedBtn').addEventListener('click', () => {
+                showRewardedAd(() => {
+                    addLog('🎁 Reward given (test)', 'success');
+                });
+            });
+            
+            document.getElementById('testInterstitialBtn').addEventListener('click', showInterstitialAd);
+            document.getElementById('testTaskBtn').addEventListener('click', showTaskAd);
+            document.getElementById('checkCampaignsBtn').addEventListener('click', checkCampaigns);
 
             // ====================================================
             // INITIALIZATION
@@ -572,23 +747,18 @@
             // Start the game
             nextWord();
             
-            // Update privacy link - REPLACE THIS WITH YOUR ACTUAL PRIVACY URL
+            // Update privacy link - REPLACE WITH YOUR ACTUAL URL
             document.getElementById('privacyLink').href = '#'; // Change to your privacy policy URL
 
             // Telegram Mini App integration
             if (window.Telegram?.WebApp) {
                 window.Telegram.WebApp.ready();
                 window.Telegram.WebApp.expand();
-                console.log('✅ Telegram WebApp initialized');
+                addLog('✅ Telegram WebApp initialized', 'success');
             }
 
-            // Log to console for debugging
-            console.log('🚀 ScrambleMaster started with debug mode');
-            console.log('Block IDs:', {
-                rewarded: REWARD_BLOCK_ID,
-                interstitial: INTERSTITIAL_BLOCK_ID,
-                task: TASK_BLOCK_ID
-            });
+            addLog('🚀 ScrambleMaster started', 'success');
+            checkCampaigns();
 
         })();
     </script>
@@ -597,4 +767,3 @@
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
 </body>
 </html>
-
