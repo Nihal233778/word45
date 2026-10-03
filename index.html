@@ -5,11 +5,10 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>ScrambleMaster · Word Scramble</title>
 
-
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     
-<script src="https://sdk.taddy.pro/web/taddy.min.js" data-pub-id="0f8e625f3fe8ef99d6f3ab168d92f7ee"></script>
-    
+    <!-- Taddy SDK -->
+    <script src="https://sdk.taddy.pro/web/taddy.min.js" data-pub-id="0f8e625f3fe8ef99d6f3ab168d92f7ee"></script>
 
     <style>
         * {
@@ -345,14 +344,12 @@
             // ====================================================
             const REWARD_BLOCK_ID = "24919";           // Rewarded ad format
             const INTERSTITIAL_BLOCK_ID = "int-24917";  // Interstitial ad format
-            const TASK_BLOCK_ID = "task-24920";         // Task ad format
+            // TASK_BLOCK_ID is no longer needed here, Taddy handles it.
             
             // ====================================================
             // SETTINGS
             // ====================================================
-            // For YOU (developer) - keep true to see test ads
-            // For real users - keep false, they'll see real ads if available in their region
-            const DEBUG_MODE = false;  // true = test ads for you, false = real ads for users
+            const DEBUG_MODE = false;  
             
             // ====================================================
             // WORD LIST
@@ -389,14 +386,12 @@
             // DETECT USER LOCATION (approximate)
             // ====================================================
             function detectUserRegion() {
-                // Try to get timezone as rough location indicator
                 const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
                 const language = navigator.language;
                 
                 let regionInfo = 'Unknown';
                 let isTier1 = false;
                 
-                // Check for Tier 1 countries (where most ads target)
                 if (timezone) {
                     if (timezone.includes('America/New_York') || 
                         timezone.includes('America/Los_Angeles') ||
@@ -428,7 +423,6 @@
 
             const userRegion = detectUserRegion();
             
-            // Update geo info box
             if (userRegion.isTier1) {
                 geoInfoBox.innerHTML = `📍 You are in <strong>${userRegion.region}</strong> (Tier 1) - You should see real ads!`;
                 geoInfoBox.style.color = '#155724';
@@ -447,14 +441,12 @@
                     if (window.Adsgram) {
                         console.log(`✅ Adsgram SDK loaded, DEBUG_MODE: ${DEBUG_MODE ? 'ON (test ads)' : 'OFF (real ads)'}`);
                         
-                        // Initialize Rewarded Ad Controller
                         rewardedController = window.Adsgram.init({ 
                             blockId: REWARD_BLOCK_ID,
                             debug: DEBUG_MODE,
                             debugBannerType: "RewardedVideo"
                         });
                         
-                        // Add event listeners
                         rewardedController.addEventListener('onBannerNotFound', () => {
                             console.log('No ad available for this request');
                             if (!DEBUG_MODE && !userRegion.isTier1) {
@@ -462,7 +454,6 @@
                             }
                         });
                         
-                        // Initialize Interstitial Ad Controller
                         interstitialController = window.Adsgram.init({ 
                             blockId: INTERSTITIAL_BLOCK_ID,
                             debug: DEBUG_MODE,
@@ -490,7 +481,7 @@
             initAdsgram();
 
             // ====================================================
-            // SHOW REWARDED AD
+            // SHOW REWARDED AD (Adsgram)
             // ====================================================
             function showRewardedAd(rewardCallback) {
                 if (!rewardedController) {
@@ -533,7 +524,7 @@
             }
 
             // ====================================================
-            // SHOW INTERSTITIAL AD
+            // SHOW INTERSTITIAL AD (Adsgram)
             // ====================================================
             function showInterstitialAd() {
                 if (!interstitialController) {
@@ -572,42 +563,52 @@
             }
 
             // ====================================================
-            // SHOW TASK AD
+            // SHOW TASK AD (Taddy Exchange Integration - Nani's Code)
             // ====================================================
-            function showTaskAd() {
-                if (!window.Adsgram || !window.Adsgram.TaskAd) {
-                    alert('Task ads not available. Please try again.');
+            async function showTaskAd() {
+                if (!window.taddy) {
+                    alert('Taddy SDK not loaded. Please refresh.');
                     return;
                 }
 
-                messageEl.innerText = '⏳ Loading task ad...';
-                
-                const taskAd = window.Adsgram.TaskAd.init({ 
-                    blockId: TASK_BLOCK_ID,
-                    debug: DEBUG_MODE
-                });
-                
-                taskAd.show()
-                    .then((result) => {
-                        console.log('✅ Task ad completed:', result);
-                        messageEl.innerText = '✅ Task completed! +2 bonus points!';
-                        
-                        score += 2;
-                        updateScore();
-                    })
-                    .catch((result) => {
-                        console.log('❌ Task ad error:', result);
-                        
-                        if (result.description && result.description.includes('No fill')) {
-                            if (DEBUG_MODE) {
-                                messageEl.innerText = '⚠️ Test task unavailable';
-                            } else {
-                                messageEl.innerText = '📺 No task ads available';
-                            }
-                        } else {
-                            messageEl.innerText = '❌ Task failed. Try again?';
-                        }
+                messageEl.innerText = '⏳ Loading Taddy tasks...';
+
+                try {
+                    // Get the exchange module
+                    const exchange = window.taddy.exchange();
+
+                    // Fetch a list of tasks
+                    const items = await exchange.feed({ 
+                        limit: 8, 
+                        imageFormat: 'png', 
+                        autoImpressions: true, 
+                        showCompleted: true 
                     });
+
+                    if (items && items.length > 0) {
+                        const firstItem = items[0];
+                        messageEl.innerText = '⏳ Opening task...';
+
+                        // Open a task and automatically check if the user completed it
+                        exchange.open(firstItem).then(() => {
+                            console.log('Task completed! Reward the user.');
+                            messageEl.innerText = '✅ Task completed! +2 bonus points!';
+                            
+                            // YOUR REWARD LOGIC
+                            score += 2; 
+                            updateScore();
+                            
+                        }).catch(() => {
+                            console.log('Task was not completed.');
+                            messageEl.innerText = '❌ Task not completed. No reward.';
+                        });
+                    } else {
+                        messageEl.innerText = '📭 No tasks available right now.';
+                    }
+                } catch (error) {
+                    console.error('❌ Taddy Task Error:', error);
+                    messageEl.innerText = '❌ Error loading tasks. Try again.';
+                }
             }
 
             // ====================================================
@@ -683,7 +684,7 @@
             // ====================================================
             
             nextWord();
-            document.getElementById('privacyLink').href = '#'; // Replace with your privacy URL
+            document.getElementById('privacyLink').href = '#'; 
 
             if (window.Telegram?.WebApp) {
                 window.Telegram.WebApp.ready();
